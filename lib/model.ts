@@ -8,8 +8,11 @@
 //   implied = TVL x peerRatio(category) x growthMult(change_7d) x maturityMult(age) x breadthMult(chains)
 //
 // peerRatio   median mcap/TVL of tokenized protocols in the same category, winsorized to
-//             [0.02, 3.0] so one outlier cannot dominate. Categories with fewer than 3 peers
-//             blend 50/50 with the global median; a category with no peers uses the global median.
+//             [0.02, 3.0] so one outlier cannot dominate. Only peers with at least $20M TVL
+//             count as comps (a $12M protocol cannot price a $2.7B one). The category median
+//             is shrunk toward the global median by peer count, ratio = (n x med + 4 x global)
+//             / (n + 4), so one or two peers move the estimate only partway; a category with
+//             no qualifying peers uses the global median outright.
 // growthMult  1 + clamp(change_7d, -30, +30)/100 x 0.6  (range 0.82 .. 1.18; unknown change -> 1)
 // maturityMult 0.80 + 0.40 x min(age_days, 1095)/1095  (range 0.80 .. 1.20; unknown age -> 365d)
 //              A protocol that has run longer with no token has a longer proven record.
@@ -110,7 +113,7 @@ export function peerRatios(snapshot: Snapshot, model: ModelConstants = MODEL): {
   const all: number[] = [];
   const cats = new Map<string, number[]>();
   for (const p of snapshot.protocols) {
-    if (isPreToken(p) || p.mcap_usd === null || p.mcap_usd <= 0 || p.tvl_usd <= 0) continue;
+    if (isPreToken(p) || p.mcap_usd === null || p.mcap_usd <= 0 || p.tvl_usd < 20_000_000) continue;
     const r = clampRatio(p.mcap_usd / p.tvl_usd);
     all.push(r);
     const key = p.category ?? '(none)';
@@ -121,7 +124,7 @@ export function peerRatios(snapshot: Snapshot, model: ModelConstants = MODEL): {
   const byCategory = new Map<string, { ratio: number; count: number }>();
   for (const [key, xs] of cats) {
     const med = median(xs);
-    const ratio = xs.length >= model.min_peers ? med : (med + global) / 2;
+    const ratio = (xs.length * med + 4 * global) / (xs.length + 4);
     byCategory.set(key, { ratio, count: xs.length });
   }
   return { global, byCategory };
@@ -139,7 +142,7 @@ export function impliedValue(
   const peerRatio = peer ? peer.ratio : peers.global;
   const peerCount = peer ? peer.count : 0;
   const peerSource = peerCount >= model.min_peers ? `category median, ${peerCount} tokenized peers`
-    : peerCount > 0 ? `category median blended with global, ${peerCount} peer(s)` : 'global median (no tokenized peers in category)';
+    : peerCount > 0 ? `category median shrunk toward global, ${peerCount} peer(s)` : 'global median (no qualifying tokenized peers in category)';
   const growthPct = Math.min(model.growth_cap, Math.max(model.growth_floor, finite(protocol.change_7d, 0)));
   const growthMult = protocol.change_7d === null ? 1 : 1 + (growthPct / 100) * model.growth_weight;
   const ageForModel = age ?? model.unknown_age_days;
@@ -147,7 +150,7 @@ export function impliedValue(
   const breadthMult = 1 + model.breadth_step * Math.min(Math.max(protocol.chains.length - 1, 0), model.breadth_max_extra_chains);
   const implied = Math.max(1, Math.round(protocol.tvl_usd * peerRatio * growthMult * maturityMult * breadthMult));
   const confidence = peerCount >= 8 && protocol.tvl_usd >= 100_000_000 ? 'high'
-    : peerCount >= 3 && protocol.tvl_usd >= 25_000_000 ? 'medium' : 'early';
+    : peerCount >= 3 && protocol.tvl_usd >= 25_000_000 ? 'medium' : 'low';
   const workings: Workings = {
     peer_ratio: round4(peerRatio), peer_count: peerCount, peer_source: peerSource,
     growth_pct: growthPct, growth_multiplier: round4(growthMult),

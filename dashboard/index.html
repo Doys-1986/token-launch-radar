@@ -3,12 +3,62 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Token Radar: pre-token protocols ranked by implied value</title>
+<title>Token Launch Radar — pre-token protocols ranked by implied launch value</title>
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
-<a class="skip" href="#board">Skip to the board</a>
-<main id="board" tabindex="-1" aria-busy="true"></main>
+<header class="top">
+  <div class="brand"><span class="dot"></span><div>
+    <h1>Token Launch Radar</h1>
+    <p class="sub">Protocols that record no token yet, ranked by what a launch would be worth — and exactly how to farm each one. Snapshot <span id="asof">—</span> · model <b>radar-2</b> · data: DefiLlama via sealed snapshot, renders fully offline.</p>
+  </div></div>
+  <div class="stats" id="stats"></div>
+</header>
+
+<section class="model card">
+  <h2>How the implied value works</h2>
+  <p class="formula">Implied value = TVL × <b>peer ratio</b> × <b>growth</b> × <b>maturity</b> × <b>breadth</b></p>
+  <div class="mgrid">
+    <div><b>Peer ratio</b><span>Median market-cap/TVL of tokenized protocols in the same category (peers ≥ $20M TVL, winsorized 0.02–3.0), shrunk toward the global median by peer count: (n·median + 4·global)/(n+4). Global median here: <span id="globalratio">—</span>×.</span></div>
+    <div><b>Growth</b><span>1 + clamp(change_7d, −30%, +30%) × 0.6 → 0.82–1.18. Momentum is rewarded, spikes are capped, missing data is neutral.</span></div>
+    <div><b>Maturity</b><span>0.80 + 0.40 × min(age, 3 yrs)/3 yrs. Longer running with no token = longer proven record.</span></div>
+    <div><b>Breadth</b><span>1 + 0.03 per extra chain, max +15%. Multichain reach is launch-day distribution.</span></div>
+  </div>
+  <p class="note">Every row shows its own workings — peer ratio, peer count and all three multipliers — so any number on this board can be recomputed from the snapshot. Tokenized protocols are never ranked; they appear below at real market cap, and they are the peers this model learns from. “Records no token” is DefiLlama’s record, not proof a token does not exist. No launch is predicted and no token is promised: implied value is this board’s own claim about what a launch would be worth if the record stayed as it is.</p>
+</section>
+
+<section class="controls card">
+  <input id="q" type="search" placeholder="Search protocol, category, chain…">
+  <select id="fcat"><option value="">All categories</option></select>
+  <select id="fchain"><option value="">All chains</option></select>
+  <select id="fconf"><option value="">Any confidence</option><option>high</option><option>medium</option><option>low</option></select>
+  <label class="chk"><input id="fwatch" type="checkbox"> Watchlist only (≥ $50M TVL)</label>
+  <label class="chk"><input id="fgrow" type="checkbox"> Growing (7d &gt; 0)</label>
+  <span class="count" id="count"></span>
+</section>
+
+<main class="card">
+  <table id="board">
+    <thead><tr>
+      <th data-k="rank">#</th><th data-k="name">Protocol</th><th data-k="category">Category</th>
+      <th data-k="tvl_usd" class="num">TVL</th><th data-k="change_7d" class="num">7d %</th>
+      <th data-k="peer_ratio" class="num">Peer ×</th><th data-k="implied_value_usd" class="num">Implied value</th>
+      <th data-k="confidence">Conf.</th>
+    </tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <p class="hint">Click any row for the full breakdown and its farm plan. Click a column header to sort.</p>
+</main>
+
+<section id="detail" class="card hidden"></section>
+
+<section class="card">
+  <h2>Already trading — the peer set (not ranked)</h2>
+  <p class="note">These protocols already record a token, so the board shows the market’s own value, never a model estimate. Their market-cap/TVL ratios are exactly what prices the pre-token board above.</p>
+  <table id="live"><thead><tr><th>Protocol</th><th>Category</th><th class="num">TVL</th><th class="num">Market cap</th><th class="num">Mcap/TVL</th></tr></thead><tbody id="liverows"></tbody></table>
+</section>
+
+<footer>Built for make.fun token-radar-01 · Implied values are estimates from one sealed snapshot (<span id="asof2">—</span>), not financial advice.</footer>
 <script src="../data.js"></script>
 <script src="app.js"></script>
 </body>
